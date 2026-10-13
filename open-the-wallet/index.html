@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Open the wallet</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #f4f4f4;
+    --ink: #4a4a4a;
+    --ink-soft: #9a9a9a;
+    --btn: #e6e6e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #2b2b2b; --ink: #d0d0d0; --ink-soft: #7a7a7a; --btn: #3a3a3a; }
+  }
+  :root[data-theme="dark"] { --bg: #2b2b2b; --ink: #d0d0d0; --ink-soft: #7a7a7a; --btn: #3a3a3a; }
+  html { height: 100%; scroll-padding-top: env(safe-area-inset-top, 0px); }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    height: 100%; margin: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; -webkit-user-select: none; user-select: none;
+  }
+  #stage {
+    position: relative;
+    width: min(94vw, 760px, calc((100dvh - 150px) * 400 / 260));
+    aspect-ratio: 400 / 260;
+    touch-action: none;
+  }
+  #stage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  #base { pointer-events: none; }
+  #coverWrap { position: absolute; inset: 0; pointer-events: none; }
+  #cover {
+    position: absolute; inset: 0;
+    transform-style: preserve-3d;
+    transform-origin: 50% 50%;
+    will-change: transform;
+  }
+  .slice { position: absolute; inset: 0; pointer-events: none; will-change: transform; }
+  .slice svg { pointer-events: none; }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .face svg { pointer-events: none; }
+  .face .hit { pointer-events: visiblePainted; cursor: grab; }
+  #stage.dragging .hit { cursor: grabbing; }
+  #stage.done .hit { cursor: default; }
+  #outer { transform: rotateY(180deg); }
+
+  #edgeGlow { animation: glow 2.4s ease-in-out infinite; }
+  @keyframes glow { 0%,100% { opacity: .25; } 50% { opacity: .85; } }
+
+  #coins .coin { transform-box: fill-box; transform-origin: 50% 100%; }
+  #coins.settle .coin { animation: settle .6s cubic-bezier(.3,1.5,.5,1) both; }
+  @keyframes settle {
+    0% { transform: translateY(0) rotate(0); }
+    35% { transform: translateY(-9px) rotate(-3deg); }
+    65% { transform: translateY(2px) rotate(1.5deg); }
+    100% { transform: translateY(0) rotate(0); }
+  }
+
+  #reset {
+    position: fixed;
+    right: max(18px, env(safe-area-inset-right, 0px));
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 0; background: var(--btn); color: var(--ink);
+    display: grid; place-items: center; cursor: pointer;
+    transition: transform .25s ease;
+  }
+  #reset:hover { transform: rotate(-40deg); }
+  #reset:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #edgeGlow { animation: none; opacity: .6; }
+    #coins.settle .coin { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <!-- Base: back panel + right half of the wallet (from bifold_wallet) with the coins (from three_coins) tucked in -->
+  <svg id="base" viewBox="0 0 400 260" aria-hidden="true">
+    <defs>
+      <clipPath id="rightHalf"><rect x="196" y="0" width="210" height="260"/></clipPath>
+    </defs>
+    <!-- Wallet body (back panel) -->
+    <rect x="60" y="60" width="280" height="150" rx="10" ry="10" fill="#9a9a9a" stroke="#000" stroke-width="2" clip-path="url(#rightHalf)"/>
+    <!-- Soft shadow beneath the lifted right flap -->
+    <path id="flapShadow" d="M200 64 L338 60 L340 208 L200 208 Z" fill="#7a7a7a"/>
+    <!-- Right flap -->
+    <path d="M200 60 L336 52 A10 10 0 0 1 346 62 L348 196 A10 10 0 0 1 338 206 L200 210 Z"
+          fill="#d6d6d6" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M208 67 L332 60 A6 6 0 0 1 338 66 L340 192 A6 6 0 0 1 334 198 L208 201 Z"
+          fill="none" stroke="#7a7a7a" stroke-width="1.5" stroke-dasharray="5 4" stroke-linejoin="round"/>
+
+    <!-- Coins -->
+    <g id="coins">
+      <!-- each coin leans into the pocket at its own angle; a faint contact shadow grounds it -->
+      <!-- back coin: slid in deep on the left, tilted away -->
+      <g transform="translate(237 112) rotate(-14) scale(0.43 0.36)">
+        <ellipse cx="5" cy="10" rx="62" ry="62" fill="#000" opacity="0.18"/>
+        <g class="coin" style="animation-delay:.06s">
+          <circle cx="0" cy="0" r="62" fill="#a8a8a8" stroke="#000" stroke-width="4.5"/>
+          <circle cx="-2" cy="-3" r="48" fill="none" stroke="#7e7e7e" stroke-width="4.5"/>
+        </g>
+      </g>
+      <!-- right coin: perched higher, leaning against the flap edge -->
+      <g transform="translate(306 99) rotate(11) scale(0.41 0.39)">
+        <ellipse cx="-4" cy="9" rx="62" ry="62" fill="#000" opacity="0.18"/>
+        <g class="coin" style="animation-delay:.14s">
+          <circle cx="0" cy="0" r="62" fill="#bdbdbd" stroke="#000" stroke-width="4.5"/>
+          <circle cx="2" cy="-2" r="48" fill="none" stroke="#8e8e8e" stroke-width="4.5"/>
+        </g>
+      </g>
+      <!-- front coin: sitting lower, half tucked, overlapping both -->
+      <g transform="translate(268 116) rotate(-4) scale(0.45 0.42)">
+        <ellipse cx="3" cy="10" rx="62" ry="62" fill="#000" opacity="0.2"/>
+        <g class="coin" style="animation-delay:0s">
+          <circle cx="0" cy="0" r="62" fill="#d4d4d4" stroke="#000" stroke-width="4.5"/>
+          <circle cx="-1" cy="-4" r="48" fill="none" stroke="#9e9e9e" stroke-width="4.5"/>
+        </g>
+      </g>
+    </g>
+
+    <!-- Pocket, right flap (coins sit inside it) -->
+    <path d="M210 125 Q272 114 334 121 L336 194 L210 197 Z" fill="#c6c6c6" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M210 158 Q272 148 335 154 L336 194 L210 197 Z" fill="#b6b6b6" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+
+    <!-- Darkness inside while the cover is closed -->
+    <path id="innerShade" d="M200 60 L336 52 A10 10 0 0 1 346 62 L348 196 A10 10 0 0 1 338 206 L200 210 Z" fill="#000" opacity="0.35"/>
+
+    <!-- Center fold -->
+    <line x1="200" y1="60" x2="200" y2="210" stroke="#000" stroke-width="3"/>
+    <path id="foldInner" d="M204 62 L204 208" fill="none" stroke="#8a8a8a" stroke-width="2"/>
+  </svg>
+
+  <div id="coverWrap">
+    <div id="cover">
+      <!-- Inside of the left half (from bifold_wallet), seen once the wallet is open -->
+      <div class="face" id="inner">
+        <svg viewBox="0 0 400 260" aria-hidden="true">
+          <defs>
+            <linearGradient id="shadeIn" x1="200" y1="0" x2="60" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#000" stop-opacity="0.15"/>
+              <stop offset="1" stop-color="#000" stop-opacity="0.75"/>
+            </linearGradient>
+          </defs>
+          <path class="hit" d="M70 60 H200 V210 H70 A10 10 0 0 1 60 200 V70 A10 10 0 0 1 70 60 Z"
+                fill="#c4c4c4" stroke="#000" stroke-width="2"/>
+          <path d="M76 70 H192 V200 H76 A6 6 0 0 1 70 194 V76 A6 6 0 0 1 76 70 Z"
+                fill="none" stroke="#6e6e6e" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <path d="M78 110 Q134 100 190 110 V198 H78 Z" fill="#b8b8b8" stroke="#000" stroke-width="1.5"/>
+          <path d="M78 135 Q134 125 190 135 V198 H78 Z" fill="#ababab" stroke="#000" stroke-width="1.5"/>
+          <path d="M78 160 Q134 150 190 160 V198 H78 Z" fill="#9e9e9e" stroke="#000" stroke-width="1.5"/>
+          <g id="creasesIn" fill="none" stroke="#000" stroke-linecap="round"></g>
+          <path id="shadeInRect" d="M70 60 H200 V210 H70 A10 10 0 0 1 60 200 V70 A10 10 0 0 1 70 60 Z"
+                fill="url(#shadeIn)" opacity="0" pointer-events="none"/>
+        </svg>
+      </div>
+      <!-- Outside of the left half, lying folded over the right half while closed -->
+      <div class="face" id="outer">
+        <svg viewBox="0 0 400 260" aria-hidden="true">
+          <defs>
+            <linearGradient id="shadeOut" x1="200" y1="0" x2="340" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#000" stop-opacity="0.15"/>
+              <stop offset="1" stop-color="#000" stop-opacity="0.75"/>
+            </linearGradient>
+          </defs>
+          <g transform="translate(400 0) scale(-1 1)">
+            <path class="hit" d="M70 60 H200 V210 H70 A10 10 0 0 1 60 200 V70 A10 10 0 0 1 70 60 Z"
+                  fill="#a6a6a6" stroke="#000" stroke-width="2"/>
+            <path d="M76 70 H192 V200 H76 A6 6 0 0 1 70 194 V76 A6 6 0 0 1 76 70 Z"
+                  fill="none" stroke="#6e6e6e" stroke-width="1.5" stroke-dasharray="5 4"/>
+          </g>
+          <!-- Raised grab edge + highlight -->
+          <path d="M334 61 Q339 62 339 68 V202 Q339 208 334 209" fill="none" stroke="#c8c8c8" stroke-width="3" pointer-events="none"/>
+          <path id="edgeGlow" d="M333 64 V206" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" pointer-events="none"/>
+          <g id="creasesOut" fill="none" stroke="#000" stroke-linecap="round"></g>
+          <path id="shadeOutRect" d="M330 60 H200 V210 H330 A10 10 0 0 0 340 200 V70 A10 10 0 0 0 330 60 Z"
+                fill="url(#shadeOut)" opacity="0" pointer-events="none"/>
+          <!-- Generous invisible grab strip along the free edge -->
+          <rect class="hit" x="300" y="56" width="50" height="158" fill="transparent"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button id="reset" aria-label="Reset">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+  </svg>
+</button>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const wrap = document.getElementById('coverWrap');
+  const cover = document.getElementById('cover');
+  const creasesIn = document.getElementById('creasesIn');
+  const creasesOut = document.getElementById('creasesOut');
+  const shadeIn = document.getElementById('shadeInRect');
+  const shadeOut = document.getElementById('shadeOutRect');
+  const innerShade = document.getElementById('innerShade');
+  const flapShadow = document.getElementById('flapShadow');
+  const foldInner = document.getElementById('foldInner');
+  const edgeGlow = document.getElementById('edgeGlow');
+  const coins = document.getElementById('coins');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const REST_CLOSED = 176;   // closed, free edge resting slightly raised
+  const HALF = 140;          // hinge-to-edge width in viewBox units
+
+  let phi = REST_CLOSED, vel = 0, target = REST_CLOSED;
+  let lift = 0, liftTarget = 0;
+  let dragging = false, done = false;
+  let grabX = 0, grabEdge = 0, lastP = 0, crinkleAcc = 0;
+
+  // value noise for crinkly irregularity
+  const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const noise = x => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return (hash(i) * (1 - u) + hash(i + 1) * u) * 2 - 1; };
+
+  // build crease paths
+  const mk = (g, n) => Array.from({ length: n }, () => {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); g.appendChild(p); return p;
+  });
+  const cIn = mk(creasesIn, 4), cOut = mk(creasesOut, 4);
+
+  // ---- thickness: stacked leather layers (oblique extrusion toward bottom-right) ----
+  const TV = { x: 2.5, y: 9 };   // full wallet-half thickness, viewBox units
+  const N = 12;                    // slices per half
+  const NS = 'http://www.w3.org/2000/svg';
+  const sliceFill = t => { const v = Math.round(0x8e - t * 0x30); return `rgb(${v},${v},${v})`; };
+  const sliceStroke = i => i === 0 ? ' stroke="#000" stroke-width="2"'
+    : (i === Math.floor(N / 2) ? ' stroke="#b4b4b4" stroke-width="1.2" stroke-dasharray="4 3"' : '');
+  // i = 0 is the bottom-most layer (drawn first), i = N-1 sits right under the top surface
+  const RIGHT_SIL = 'M200 60 L336 52 A10 10 0 0 1 346 62 L348 196 A10 10 0 0 1 338 206 L200 210 Z';
+  const BACK_SIL = 'M200 60 H330 A10 10 0 0 1 340 70 V200 A10 10 0 0 1 330 210 H200 Z';
+  const LEFT_SIL = 'M70 60 H200 V210 H70 A10 10 0 0 1 60 200 V70 A10 10 0 0 1 70 60 Z';
+
+  // base (right half) layers, inside the base SVG beneath its top surface
+  const baseSvg = document.getElementById('base');
+  const baseLayers = document.createElementNS(NS, 'g');
+  let bl = '';
+  for (let i = 0; i < N; i++) {
+    const t = 1 - i / (N - 1);   // 1 = bottom
+    const f = sliceFill(t), s = sliceStroke(i);
+    bl += `<g transform="translate(${(TV.x * t).toFixed(2)} ${(TV.y * t).toFixed(2)})">` +
+          `<path d="${BACK_SIL}" fill="${f}"${s}/><path d="${RIGHT_SIL}" fill="${f}"${s}/></g>`;
+  }
+  baseLayers.innerHTML = bl;
+  baseSvg.insertBefore(baseLayers, baseSvg.querySelector(':scope > rect'));
+
+  // cover (left half) layers, as screen-space offset copies that rotate with the cover
+  const slices = [];
+  for (let i = 0; i < N; i++) {
+    const t = 1 - i / (N - 1);
+    const d = document.createElement('div');
+    d.className = 'slice';
+    d.innerHTML = `<svg viewBox="0 0 400 260" aria-hidden="true"><path d="${LEFT_SIL}" fill="${sliceFill(t)}"${sliceStroke(i)}/></svg>`;
+    wrap.insertBefore(d, cover);
+    slices.push({ el: d, t });
+  }
+
+  function sizePerspective() {
+    wrap.style.perspective = (stage.clientWidth * 2.2) + 'px';
+  }
+  sizePerspective();
+  addEventListener('resize', sizePerspective);
+
+  const toVB = e => {
+    const r = stage.getBoundingClientRect();
+    return (e.clientX - r.left) / r.width * 400;
+  };
+  const edgeX = a => 200 - HALF * Math.cos(a * Math.PI / 180);
+
+  // ---- crinkle sound: tiny filtered noise ticks ----
+  let ac = null, noiseBuf = null;
+  function audioInit() {
+    if (ac) { ac.resume && ac.resume(); return; }
+    try {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.08, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    } catch (_) { ac = null; }
+  }
+  function crinkle(strength) {
+    if (!ac) return;
+    try {
+      const t = ac.currentTime;
+      const src = ac.createBufferSource(); src.buffer = noiseBuf;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass';
+      bp.frequency.value = 2200 + Math.random() * 4500; bp.Q.value = 1.4 + Math.random() * 2;
+      const g = ac.createGain();
+      const dur = 0.012 + Math.random() * 0.03;
+      const peak = Math.min(0.11, 0.025 + strength * 0.08);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(peak, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+      src.connect(bp).connect(g).connect(ac.destination);
+      src.start(t, Math.random() * 0.03, dur + 0.01);
+    } catch (_) {}
+  }
+
+  // ---- interaction ----
+  stage.addEventListener('pointerdown', e => {
+    if (done || !e.target.classList || !e.target.classList.contains('hit')) return;
+    e.preventDefault();
+    audioInit();
+    dragging = true;
+    stage.classList.add('dragging');
+    stage.setPointerCapture(e.pointerId);
+    grabX = toVB(e);
+    grabEdge = edgeX(phi);
+    liftTarget = 1;          // on contact: the edge lifts
+    vel = 0;
+    crinkle(0.6);
+  });
+
+  stage.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const ex = grabEdge + (toVB(e) - grabX);
+    const c = Math.max(-1, Math.min(1, (200 - ex) / HALF));
+    const raw = Math.acos(c) * 180 / Math.PI;           // 0 open .. 180 closed
+    target = Math.min(REST_CLOSED, raw);
+    const p = 1 - target / 180;
+    // crinkle ticks proportional to travel
+    const dp = Math.abs(p - lastP); lastP = p;
+    crinkleAcc += dp;
+    while (crinkleAcc > 0.018 + Math.random() * 0.02) { crinkleAcc -= 0.02; crinkle(Math.min(1, dp * 25)); }
+    if (p >= 0.96) complete();
+  });
+
+  function release() {
+    if (!dragging) return;
+    dragging = false;
+    stage.classList.remove('dragging');
+    liftTarget = 0;
+    if (done) return;
+    const p = 1 - phi / 180;
+    if (p >= 0.8) complete();
+    else if (p < 0.35) { target = REST_CLOSED; crinkle(0.4); }   // too early: gently folds closed
+    else { target = Math.min(REST_CLOSED, phi + 5); }            // stays partially open, sags a little
+  }
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+
+  function complete() {
+    if (done) return;
+    done = true; dragging = false; liftTarget = 0;
+    stage.classList.remove('dragging');
+    stage.classList.add('done');
+    target = 0;
+    crinkle(0.9); setTimeout(() => crinkle(0.5), 70); setTimeout(() => crinkle(0.3), 160);
+    setTimeout(() => {
+      coins.classList.remove('settle'); void coins.getBBox(); coins.classList.add('settle');
+    }, reduced ? 0 : 260);
+  }
+
+  document.getElementById('reset').addEventListener('click', () => {
+    done = false; dragging = false;
+    stage.classList.remove('done', 'dragging');
+    coins.classList.remove('settle');
+    target = REST_CLOSED; liftTarget = 0;
+    if (reduced) { phi = REST_CLOSED; vel = 0; }
+    lastP = 0;
+  });
+
+  // ---- render loop ----
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+
+    if (dragging) {
+      // follow the finger closely, with a little leathery lag
+      phi += (target - phi) * Math.min(1, dt * 22);
+      vel = 0;
+    } else if (reduced) {
+      phi = target; vel = 0;
+    } else {
+      const k = done ? 90 : 60, c = done ? 11 : 13;
+      const acc = -k * (phi - target) - c * vel;
+      vel += acc * dt; phi += vel * dt;
+      if (Math.abs(phi - target) < 0.02 && Math.abs(vel) < 0.02) { phi = target; vel = 0; }
+    }
+    lift += (liftTarget - lift) * Math.min(1, dt * 14);
+
+    const p = Math.max(0, Math.min(1, 1 - phi / 180));
+    const bend = Math.sin(Math.PI * p);                      // how "in motion" the fold is
+    const jit = dragging && !reduced ? noise(p * 55) * 1.4 * bend : 0;
+    const shown = phi - lift * 9 + jit;                      // contact lift raises the free edge
+    const ry = dragging ? noise(p * 30 + 7) * 0.6 * bend : 0;
+
+    // the cover rests on the table when open, on top of the right half when closed
+    const k = stage.clientWidth / 400;
+    const rise = Math.max(0, Math.min(1, 1 - p));
+    const ox = -TV.x * rise * k, oy = -TV.y * rise * k;
+    const rot = `rotateY(${shown}deg) rotateX(${ry}deg) translateY(${-lift * 1.5}px)`;
+    cover.style.transform = `translate(${ox}px, ${oy}px) ${rot}`;
+    for (const s of slices) {
+      s.el.style.transform = `translate(${ox + TV.x * s.t * k}px, ${oy + TV.y * s.t * k}px) ${rot}`;
+    }
+
+    // shading: faces darken when turned away from the light (edge-on)
+    const s = Math.abs(Math.sin(shown * Math.PI / 180));
+    shadeIn.setAttribute('opacity', (s * 0.75).toFixed(3));
+    shadeOut.setAttribute('opacity', (s * 0.75 + lift * 0.08).toFixed(3));
+
+    // interior brightens as it's revealed
+    innerShade.setAttribute('opacity', (0.38 * Math.pow(1 - p, 1.4)).toFixed(3));
+    flapShadow.setAttribute('opacity', (0.6 + 0.4 * bend).toFixed(3));
+
+    // crinkly creases near the fold that change shape as it opens
+    const crease = bend * 0.9 + lift * 0.35;
+    for (let i = 0; i < 4; i++) {
+      const off = 8 + i * 13 + noise(i * 3.1 + p * 18) * 3 * crease;
+      const b = (5 + i * 2.5) * crease * (0.6 + 0.6 * noise(i * 5.7 + p * 26));
+      const y1 = 62 + i * 9 + noise(i + p * 9) * 6, y2 = 208 - i * 7;
+      const ym = 135 + noise(i * 2 + p * 14) * 25;
+      const op = (0.12 + 0.28 * crease) * (1 - i * 0.18);
+      cIn[i].setAttribute('d', `M${200 - off} ${y1} Q${200 - off - b} ${ym} ${200 - off + b * 0.3} ${y2}`);
+      cOut[i].setAttribute('d', `M${200 + off} ${y1} Q${200 + off + b} ${ym} ${200 + off - b * 0.3} ${y2}`);
+      cIn[i].setAttribute('stroke-opacity', op.toFixed(3));
+      cOut[i].setAttribute('stroke-opacity', op.toFixed(3));
+      cIn[i].setAttribute('stroke-width', (1 + 0.6 * crease).toFixed(2));
+      cOut[i].setAttribute('stroke-width', (1 + 0.6 * crease).toFixed(2));
+    }
+    // inner fold line buckles while moving
+    const fb = 3 * bend + 1.5 * lift;
+    foldInner.setAttribute('d', `M204 62 Q${204 + fb} ${110 + noise(p * 20) * 10} 204 135 Q${204 - fb * 0.6} ${165 + noise(p * 23 + 4) * 10} 204 208`);
+
+    // signifier fades once the user engages
+    edgeGlow.style.display = (p > 0.06 || done) ? 'none' : '';
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
