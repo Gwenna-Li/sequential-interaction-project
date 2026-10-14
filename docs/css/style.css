@@ -104,7 +104,7 @@ body {
 #machine { outline: none; }
 .step-4 #machine { cursor: grab; }
 body.holding, body.holding #machine { cursor: grabbing; }
-body.done #machine { cursor: default; }
+body.done #machine, body.intro #machine { cursor: default; }
 .focus-ring { opacity: 0; transition: opacity .15s; }
 .step-4 #machine:focus-visible .focus-ring { opacity: 1; }
 

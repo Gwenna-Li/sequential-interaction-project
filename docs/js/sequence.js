@@ -83,11 +83,14 @@
     setStep(3);
   });
 
-  // 3 → 4: the machine accepts the coin; the camera pulls back and the wallet goes to the side
+  // 3 → 4: the machine accepts the coin and starts vending (motor whir, bag drops and snags)
+  // while the camera pulls back and the wallet goes to the side. Shaking opens once it's stuck.
   App.on('accepted', async () => {
     setStep(4, true);
-    await App.delay(700);
-    await Promise.all([W.camTo('machine', 1200), W.poseTo('pocket', 1200)]);
+    await App.delay(500);
+    App.machine.startIntro();
+    const snagged = new Promise(r => { if (App.machine.stuck) r(); else App.on('snagged', r); });
+    await Promise.all([W.camTo('machine', 1200), W.poseTo('pocket', 1200), snagged]);
     setStep(4);
   });
 

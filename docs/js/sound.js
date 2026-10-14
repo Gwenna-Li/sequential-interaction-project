@@ -181,6 +181,25 @@
             { type: 'bandpass', freq: 3000 + Math.random() * 5000, q: 1.5 + Math.random() * 2, gain: (.05 + Math.random() * .08) * Math.min(a, 1.3) });
         }
       },
+      // coin accepted: relay click, then the motor turns the spiral
+      whir(d) {
+        if (!ready()) return; const t = ctx.currentTime;
+        tone(t, .05, 1800, 1400, 'square', .035);
+        const o = ctx.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(46, t + .05); o.frequency.linearRampToValueAtTime(58, t + d);
+        const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 380;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t + .05); g.gain.exponentialRampToValueAtTime(.18, t + .15);
+        g.gain.setValueAtTime(.18, t + d - .12); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(f).connect(g).connect(mBus); o.start(t + .05); o.stop(t + d + .05);
+      },
+      // bag drops, then catches on the shelf edge
+      snag() {
+        if (!ready()) return; const t = ctx.currentTime;
+        tone(t, .1, 170, 90, 'triangle', .28);
+        noise(t, .09, { type: 'bandpass', freq: 1800, q: 6, gain: .1 });
+        S.crinkle(1.1);
+      },
       // bag breaks free, then slides down past the shelves
       pop() {
         if (!ready()) return; const t = ctx.currentTime;

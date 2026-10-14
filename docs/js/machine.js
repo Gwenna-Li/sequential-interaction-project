@@ -1,5 +1,7 @@
-// Step 4 — Shake. shake-the-vending-machine, ported. The machine lives in the world SVG
-// (world units = the study's units), so its physics and tuning are unchanged.
+// Step 4 — Shake. shake-the-vending-machine (updated study), ported. The machine lives in the
+// world SVG (world units = the study's units), so its physics and tuning are unchanged.
+// The study's intro ("coin accepted, item vending") is held until startIntro() is called,
+// which the sequencer does as soon as the coin has been accepted.
 (() => {
   const App = window.App;
   const Snd = App.Sound.machine;
@@ -13,21 +15,23 @@
 
   // Geometry (vending machine coordinates)
   const FOOT_L = { x: 80, y: 566 }, FOOT_R = { x: 320, y: 566 };
+  const START = { x: 176, y: 175 };                  // bag standing on its shelf before vending
   const STUCK = { x: 176, y: 250, r: 16 };           // bag caught on the shelf edge
   const BAG_SCALE = 0.25;
   const WINDOW_BOTTOM = 450;
   const TRAY = { x: 175, rest: 503, r: 82 };          // bag lying in the tray
-  const NEED = 9;                                     // direction reversals to free the bag
-  const REVERSAL = 26;                                // svg units of travel per reversal
+  const NEED = 12;                                    // direction reversals to free the bag
+  const REVERSAL = 24;                                // svg units of travel per reversal
   const MAX_TILT = reduced ? 6 : 11;
 
   let S;
   function initial() {
     return {
-      mode: 'stuck', locked: false, holding: false, reported: false,
+      mode: 'intro', locked: true, holding: false, reported: false, introGo: false,
+      intro: { t: 0, y: START.y, vy: 0, r: 0, whir: false },
       ang: 0, angV: 0, angPrevV: 0, tx: 0, txV: 0, ty: 0, tyV: 0,
       startX: 0, curX: 0, lastX: 0, speed: 0,
-      dir: 0, ext: 0, shakes: 0,
+      dir: 0, ext: 0, shakes: 0, lastRev: 0, ready: false, readyT: 0,
       b: { x: 0, y: 0, r: 0, vx: 0, vy: 0, vr: 0 },
       f: { x: 0, y: 0, r: 0, vy: 0, vr: 0 },
       t: { y: 0, vy: 0, r: 0, bounces: 0 },
@@ -68,6 +72,10 @@
     }
   }
   function reversal() {
+    // only count real swings: the machine must actually be tilted, and not too fast
+    const now = performance.now();
+    if (S.ready || (Math.abs(S.ang) < 1.2 && Math.abs(S.angV) < 15) || now - S.lastRev < 90) return;
+    S.lastRev = now;
     S.shakes++;
     const p = S.shakes / NEED;
     // the bag hops and twists a little more each time
@@ -75,13 +83,13 @@
     S.b.vr += (Math.random() - .5) * (60 + 160 * p);
     S.b.vx += (Math.random() - .5) * 40 * p;
     Snd.crinkle(0.5 + p * 0.8);
-    if (S.shakes >= NEED) release_bag();
+    if (S.shakes >= NEED) S.ready = true;   // bag lets go on the next swing back through centre
   }
   function release() {
     if (!S.holding) return;
     S.holding = false;
     body.classList.remove('holding');
-    if (S.mode === 'stuck') { S.shakes = 0; S.dir = 0; }   // effort lost, bag settles back
+    if (S.mode === 'stuck' && !S.ready) { S.shakes = 0; S.dir = 0; }   // effort lost, bag settles back
   }
   function release_bag() {
     S.mode = 'falling'; S.locked = true;
@@ -110,7 +118,7 @@
     if (S.locked) return;
     const side = e.key === 'ArrowRight' ? 1 : -1;
     if (!S.holding) { press(0); S.key.active = true; }
-    if (S.key.active) { move(side * 40); }
+    if (S.key.active) { move(side * 60); }
     clearTimeout(S.key.timer);
     S.key.timer = setTimeout(() => { if (S.key.active) { S.key.active = false; release(); } }, 700);
   });
@@ -120,6 +128,7 @@
     clearTimeout(S.key.timer);
     S = initial();
     body.classList.remove('holding', 'done');
+    body.classList.add('intro');
     bagStuck.setAttribute('visibility', 'visible');
     bagTray.setAttribute('visibility', 'hidden');
   }
@@ -134,7 +143,7 @@
     let target = 0, txT = 0, tyT = 0;
     if (S.holding && !S.locked) {
       const d = S.curX - S.startX;
-      target = Math.max(-MAX_TILT, Math.min(MAX_TILT, d * 0.11));
+      target = Math.max(-MAX_TILT, Math.min(MAX_TILT, d * 0.2));
       txT = Math.max(-14, Math.min(14, d * 0.07));
       tyT = 2;
       S.angV += (Math.random() - .5) * Math.min(S.speed, 1500) * (reduced ? 0 : 0.035);
@@ -147,8 +156,38 @@
       Snd.knock(Math.min(1, Math.abs(S.angV) / 140));
     S.txV += (220 * (txT - S.tx) - 16 * S.txV) * dt; S.tx += S.txV * dt;
     S.tyV += (400 * (tyT - S.ty) - 18 * S.tyV) * dt; S.ty += S.tyV * dt;
+    if (S.ready && S.mode === 'stuck') {
+      S.readyT += dt;
+      if ((prevAng > 0) !== (S.ang > 0) || S.readyT > 1.2) release_bag();
+    }
 
-    if (S.mode === 'stuck') {
+    if (S.mode === 'intro') {
+      // coin already in: the spiral turns, the bag starts to drop... and catches
+      const I = S.intro;
+      if (S.introGo) {
+        I.t += dt;
+        if (I.t > 0.6 && !I.whir) { I.whir = true; Snd.whir(1.0); }
+        if (I.t < 1.6) {
+          if (I.t > 0.6) {
+            const k2 = (I.t - 0.6) / 1.0;
+            I.y = START.y + k2 * 7 + (Math.random() - .5) * 1.4;
+            I.r = k2 * 4 + (Math.random() - .5) * 2 * k2;
+          }
+        } else {
+          I.vy += 1700 * dt; I.y += I.vy * dt;
+          I.r += (24 - I.r) * Math.min(1, dt * 7);
+          if (I.y >= STUCK.y) {
+            S.mode = 'stuck'; S.locked = false; body.classList.remove('intro');
+            S.b.x = 0; S.b.y = 0; S.b.r = I.r - STUCK.r;
+            S.b.vy = 170; S.b.vr = 140; S.b.vx = (Math.random() - .5) * 40;
+            S.angV += 7; S.tyV += 25;
+            Snd.snag();
+            App.emit('snagged');
+          }
+        }
+      }
+    }
+    else if (S.mode === 'stuck') {
       const p = S.shakes / NEED;
       const bx0 = p * 3, by0 = p * 15, br0 = p * 10;
       const drive = (0.6 + p) * (reduced ? .4 : 1);
@@ -202,7 +241,10 @@
     const piv = S.ang >= 0 ? FOOT_R : FOOT_L;
     machine.setAttribute('transform',
       `translate(${S.tx.toFixed(2)},${S.ty.toFixed(2)}) rotate(${S.ang.toFixed(3)},${piv.x},${piv.y})`);
-    if (S.mode === 'stuck') {
+    if (S.mode === 'intro') {
+      bagStuck.setAttribute('transform',
+        `translate(${START.x},${S.intro.y.toFixed(2)}) rotate(${S.intro.r.toFixed(2)}) scale(${BAG_SCALE})`);
+    } else if (S.mode === 'stuck') {
       bagStuck.setAttribute('transform',
         `translate(${(STUCK.x + S.b.x).toFixed(2)},${(STUCK.y + S.b.y).toFixed(2)}) rotate(${(STUCK.r + S.b.r).toFixed(2)}) scale(${BAG_SCALE})`);
     } else if (S.mode === 'falling') {
@@ -233,5 +275,6 @@
   render();
   requestAnimationFrame(frame);
 
-  App.machine = { reset };
+  body.classList.add('intro');
+  App.machine = { reset, startIntro() { S.introGo = true; }, get stuck() { return S.mode !== 'intro'; } };
 })();

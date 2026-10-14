@@ -15,7 +15,7 @@ One continuous interaction built from three studies:
 | 1. Pick up | new, built from *open-the-wallet*'s edge behaviour | Drag the wallet's glowing near edge upward; past 80% it rises into the hand |
 | 2. Open | *open-the-wallet* | Drag the glowing free edge left |
 | 3. Insert | *insert-the-coin* | Drag a coin from the wallet into the coin slot |
-| 4. Shake | *shake-the-vending-machine* | Hold the machine and rock it left/right until the chips fall |
+| 4. Shake | *shake-the-vending-machine* (updated) | After the coin is accepted the motor whirs and the bag drops and snags; hold the machine and rock it (12 real swings), and the bag lets go on the next swing back through upright |
 
 When the chips land, an **Again** button restarts from the wallet on the ground.
 
