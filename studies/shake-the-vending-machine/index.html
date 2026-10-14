@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shake the vending machine</title>
+<style>
+  :root{
+    --canvas:#f2f2f2; --ink:#1a1a1a; --line:#8c8c8c; --btn:#ffffff; --btn-hover:#e6e6e6;
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --canvas:#2a2a2a; --ink:#ededed; --line:#7a7a7a; --btn:#363636; --btn-hover:#444444; }
+  }
+  :root[data-theme="dark"]{ --canvas:#2a2a2a; --ink:#ededed; --line:#7a7a7a; --btn:#363636; --btn-hover:#444444; }
+  *,*::before,*::after{box-sizing:inherit}
+  html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px)}
+  html,body{margin:0; background:var(--canvas)}
+  body{height:100%; overflow:hidden; color:var(--ink)}
+  #stage{display:block; width:100%; height:100%; touch-action:none; user-select:none; -webkit-user-select:none}
+  #machine{cursor:grab; outline:none}
+  body.holding, body.holding #machine{cursor:grabbing}
+  body.done #machine{cursor:default}
+  .focus-ring{opacity:0; transition:opacity .15s}
+  #machine:focus-visible .focus-ring{opacity:1}
+  .controls{
+    position:fixed;
+    top:calc(env(safe-area-inset-top,0px) + 16px);
+    right:calc(env(safe-area-inset-right,0px) + 16px);
+    display:flex; gap:10px;
+  }
+  .ctrl{
+    width:44px; height:44px; border-radius:50%;
+    border:1.5px solid var(--line); background:var(--btn); color:var(--ink);
+    display:grid; place-items:center; cursor:pointer; padding:0;
+    transition:background .15s, transform .25s;
+  }
+  .ctrl:hover{background:var(--btn-hover)}
+  #sound .off{display:none}
+  #sound[aria-pressed="true"] .on{display:none}
+  #sound[aria-pressed="true"] .off{display:block}
+  #reset:active{transform:rotate(-40deg)}
+  .ctrl:focus-visible{outline:2px solid var(--ink); outline-offset:3px}
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="-90 8 580 584" preserveAspectRatio="xMidYMid meet" aria-label="A vending machine with a bag of chips stuck behind the glass">
+  <defs>
+    <g id="bagArt" transform="translate(-150,-200)"><g stroke="#000000" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M70,62 L64,90 L60,120 L57,150 L58,180 L55,210 L57,240 L60,270 L63,300 L70,338
+             L230,338 L237,300 L240,270 L243,240 L245,210 L242,180 L243,150 L240,120 L236,90 L230,62 Z"
+          fill="#bdbdbd"/>
+    <path d="M95,75 L88,140 L86,210 L90,280 L98,325 L112,325 L106,270 L103,210 L105,140 L110,75 Z"
+          fill="#d9d9d9" stroke="none"/>
+    <path d="M70,62 L70,44 L80,36 L90,44 L100,36 L110,44 L120,36 L130,44 L140,36 L150,44
+             L160,36 L170,44 L180,36 L190,44 L200,36 L210,44 L220,36 L230,44 L230,62 Z"
+          fill="#9a9a9a"/>
+    <line x1="74" y1="51" x2="226" y2="51" stroke-width="2"/>
+    <line x1="74" y1="57" x2="226" y2="57" stroke-width="2"/>
+    <path d="M70,338 L70,356 L80,364 L90,356 L100,364 L110,356 L120,364 L130,356 L140,364 L150,356
+             L160,364 L170,356 L180,364 L190,356 L200,364 L210,356 L220,364 L230,356 L230,338 Z"
+          fill="#9a9a9a"/>
+    <line x1="74" y1="343" x2="226" y2="343" stroke-width="2"/>
+    <line x1="74" y1="349" x2="226" y2="349" stroke-width="2"/>
+    <text x="150" y="218" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif"
+          font-size="44" font-weight="900" fill="#4a4a4a" stroke="#000000" stroke-width="1.5">CHIPS</text>
+    <g fill="none" stroke-width="2">
+      <path d="M82,80 Q108,98 100,128"/>
+      <path d="M218,82 Q200,100 210,122"/>
+      <path d="M72,250 Q94,262 88,290"/>
+      <path d="M226,270 Q204,288 214,318"/>
+      <path d="M150,66 L146,90"/>
+    </g>
+  </g></g>
+    <clipPath id="windowClip" clipPathUnits="userSpaceOnUse"><rect x="86.5" y="71.5" width="177" height="377"/></clipPath>
+    <clipPath id="openingClip" clipPathUnits="userSpaceOnUse"><rect x="99.4" y="470.2" width="150.8" height="60.4"/></clipPath>
+  </defs>
+  <g id="machine" tabindex="0" role="button" aria-label="Vending machine. Hold and move left and right, or use the arrow keys, to shake it.">
+    <rect class="focus-ring" x="48" y="18" width="304" height="560" rx="14" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="6 6"/>
+    <g id="vmArt"><g stroke="#000000" stroke-width="3" stroke-linejoin="round">
+    <rect x="80" y="548" width="40" height="18" fill="#555555"/>
+    <rect x="280" y="548" width="40" height="18" fill="#555555"/>
+    <rect x="60" y="30" width="280" height="520" rx="8" fill="#bdbdbd"/>
+    <rect x="85" y="70" width="180" height="380" fill="#ececec"/>
+    <rect x="95" y="96" width="40" height="44" fill="#808080"/>
+    <rect x="155" y="96" width="40" height="44" fill="#a6a6a6"/>
+    <rect x="215" y="96" width="40" height="44" fill="#5e5e5e"/>
+    <rect x="85" y="140" width="180" height="6" fill="#4a4a4a"/>
+    <rect x="95" y="172" width="40" height="44" fill="#a6a6a6"/>
+    <rect x="155" y="172" width="40" height="44" fill="#5e5e5e"/>
+    <rect x="215" y="172" width="40" height="44" fill="#808080"/>
+    <rect x="85" y="216" width="180" height="6" fill="#4a4a4a"/>
+    <rect x="95" y="248" width="40" height="44" fill="#5e5e5e"/>
+    <rect x="155" y="248" width="40" height="44" fill="#808080"/>
+    <rect x="215" y="248" width="40" height="44" fill="#a6a6a6"/>
+    <rect x="85" y="292" width="180" height="6" fill="#4a4a4a"/>
+    <rect x="95" y="324" width="40" height="44" fill="#808080"/>
+    <rect x="155" y="324" width="40" height="44" fill="#a6a6a6"/>
+    <rect x="215" y="324" width="40" height="44" fill="#5e5e5e"/>
+    <rect x="85" y="368" width="180" height="6" fill="#4a4a4a"/>
+    <rect x="95" y="400" width="40" height="44" fill="#a6a6a6"/>
+    <rect x="155" y="400" width="40" height="44" fill="#5e5e5e"/>
+    <rect x="215" y="400" width="40" height="44" fill="#808080"/>
+    <rect x="280" y="70" width="45" height="380" fill="#9e9e9e"/>
+    <rect x="287" y="82" width="31" height="18" fill="#555555"/>
+    <g stroke-width="2" fill="#e0e0e0">
+      <rect x="288" y="115" width="8" height="8"/>
+      <rect x="299" y="115" width="8" height="8"/>
+      <rect x="310" y="115" width="8" height="8"/>
+      <rect x="288" y="126" width="8" height="8"/>
+      <rect x="299" y="126" width="8" height="8"/>
+      <rect x="310" y="126" width="8" height="8"/>
+      <rect x="288" y="137" width="8" height="8"/>
+      <rect x="299" y="137" width="8" height="8"/>
+      <rect x="310" y="137" width="8" height="8"/>
+      <rect x="288" y="148" width="8" height="8"/>
+      <rect x="299" y="148" width="8" height="8"/>
+      <rect x="310" y="148" width="8" height="8"/>
+    </g>
+    <rect x="296" y="180" width="13" height="26" fill="#d0d0d0"/>
+    <line x1="302.5" y1="185" x2="302.5" y2="201" stroke-width="2"/>
+    <rect x="289" y="222" width="27" height="6" fill="#333333"/>
+    <rect x="292" y="400" width="21" height="30" fill="#707070"/>
+    <rect x="85" y="470" width="180" height="55" fill="#8a8a8a"/>
+    <line x1="140" y1="484" x2="210" y2="484" stroke-width="4" stroke-linecap="round"/>
+  </g></g>
+    <g clip-path="url(#windowClip)">
+      <use id="bagStuck" href="#bagArt"/>
+    </g>
+    <g id="tray" transform="translate(58.8,430.8) scale(0.58)"><g stroke="#000000" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+  <rect x="40" y="40" width="320" height="160" rx="6" fill="#bdbdbd"/>
+  <rect x="70" y="68" width="260" height="104" fill="#3a3a3a"/>
+  <polygon points="70,172 330,172 312,146 88,146" fill="#6e6e6e"/>
+  <line x1="70" y1="68" x2="88" y2="146" stroke-width="2"/>
+  <line x1="330" y1="68" x2="312" y2="146" stroke-width="2"/>
+</g></g>
+    <g clip-path="url(#openingClip)">
+      <use id="bagTray" href="#bagArt" visibility="hidden"/>
+    </g>
+    <g id="trayFront" transform="translate(58.8,430.8) scale(0.58)"><g stroke="#000000" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+  <rect x="70" y="68" width="260" height="52" fill="#8f8f8f"/>
+  <line x1="160" y1="108" x2="240" y2="108" stroke-width="4"/>
+  <rect x="60" y="172" width="280" height="14" rx="3" fill="#9a9a9a"/>
+</g></g>
+  </g>
+</svg>
+
+<div class="controls">
+<button id="sound" class="ctrl" type="button" aria-label="Mute sound" aria-pressed="false">
+  <svg class="on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>
+  </svg>
+  <svg class="off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6"/><path d="M22 9l-5 6"/>
+  </svg>
+</button>
+<button id="reset" class="ctrl" type="button" aria-label="Reset">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
+  </svg>
+</button>
+</div>
+
+<script>
+(function(){
+  const svg = document.getElementById('stage');
+  const machine = document.getElementById('machine');
+  const bagStuck = document.getElementById('bagStuck');
+  const bagTray = document.getElementById('bagTray');
+  const body = document.body;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- Sound (synthesised with Web Audio, no files) ----------
+  const Snd = (() => {
+    let ctx = null, master = null, noiseBuf = null, muted = false, lastKnock = 0;
+    function ensure(){
+      if (!ctx){
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+        noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+        const d = noiseBuf.getChannelData(0);
+        for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+    function noise(t, dur, o){
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf;
+      const f = ctx.createBiquadFilter(); f.type = o.type || 'bandpass'; f.Q.value = o.q || 1;
+      f.frequency.setValueAtTime(o.freq, t);
+      if (o.freq1) f.frequency.exponentialRampToValueAtTime(o.freq1, t+dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002,o.gain), t + (o.attack || 0.002));
+      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      src.connect(f).connect(g).connect(master);
+      src.start(t, Math.random()*0.5, dur+0.05);
+    }
+    function tone(t, dur, f0, f1, type, gain){
+      const o = ctx.createOscillator(); o.type = type;
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t+dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002,gain), t+0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g).connect(master); o.start(t); o.stop(t+dur+0.05);
+    }
+    const ok = () => !muted && ensure();
+    const S = {
+      setMuted(m){ muted = m; },
+      // hand meets heavy metal cabinet
+      grab(){
+        if (!ok()) return; const t = ctx.currentTime;
+        tone(t, .12, 120, 75, 'sine', .3);
+        noise(t, .07, {type:'lowpass', freq:800, gain:.12});
+      },
+      // the raised foot lands back on the floor; cans clink inside
+      knock(s){
+        if (!ok()) return; const t = ctx.currentTime;
+        if (t - lastKnock < .09) return; lastKnock = t;
+        tone(t, .2, 95, 50, 'triangle', .45*s);
+        noise(t, .13, {type:'lowpass', freq:450, gain:.3*s});
+        noise(t+.01, .16, {type:'bandpass', freq:2200+Math.random()*900, q:14, gain:.09*s});
+        noise(t+.03, .12, {type:'bandpass', freq:3400+Math.random()*900, q:16, gain:.05*s});
+      },
+      // plastic chip bag crinkle: a cluster of tiny bright bursts
+      crinkle(a){
+        if (!ok()) return; const t = ctx.currentTime;
+        const n = 2 + Math.round(Math.min(a,1.4)*3);
+        for (let i=0;i<n;i++){
+          const dt = Math.random()*0.06;
+          noise(t+dt, .015 + Math.random()*.03,
+            {type:'bandpass', freq:3000+Math.random()*5000, q:1.5+Math.random()*2, gain:(.05+Math.random()*.08)*Math.min(a,1.3)});
+        }
+      },
+      // bag breaks free, then slides down past the shelves
+      pop(){
+        if (!ok()) return; const t = ctx.currentTime;
+        S.crinkle(1.3);
+        tone(t, .09, 240, 520, 'sine', .14);
+        noise(t+.05, .38, {type:'bandpass', freq:600, freq1:2200, q:1.2, gain:.07, attack:.08});
+      },
+      // bag lands in the tray and hits the flap
+      thud(v, first){
+        if (!ok()) return; const t = ctx.currentTime;
+        tone(t, .22, 110, 46, 'sine', .55*v);
+        noise(t, .15, {type:'lowpass', freq:380, gain:.3*v});
+        if (first) noise(t+.02, .14, {type:'bandpass', freq:1500, q:9, gain:.12*v});
+        S.crinkle(.9*v);
+      }
+    };
+    return S;
+  })();
+
+  // Geometry (vending machine coordinates)
+  const FOOT_L = {x:80, y:566}, FOOT_R = {x:320, y:566};
+  const STUCK = {x:176, y:250, r:16};           // bag caught on the shelf edge
+  const BAG_SCALE = 0.25;
+  const WINDOW_BOTTOM = 450;
+  const TRAY = {x:175, rest:503, r:82};          // bag lying in the tray
+  const NEED = 9;                                // direction reversals to free the bag
+  const REVERSAL = 26;                           // svg units of travel per reversal
+  const MAX_TILT = reduced ? 6 : 11;
+
+  let S;
+  function initial(){
+    return {
+      mode:'stuck', locked:false, holding:false,
+      ang:0, angV:0, angPrevV:0, tx:0, txV:0, ty:0, tyV:0,
+      startX:0, curX:0, lastX:0, speed:0,
+      dir:0, ext:0, shakes:0,
+      b:{x:0,y:0,r:0,vx:0,vy:0,vr:0},
+      f:{x:0,y:0,r:0,vy:0,vr:0},
+      t:{y:0,vy:0,r:0,bounces:0},
+      key:{active:false, side:0, timer:null}
+    };
+  }
+  S = initial();
+
+  function svgX(clientX, clientY){
+    const p = svg.createSVGPoint(); p.x = clientX; p.y = clientY;
+    return p.matrixTransform(svg.getScreenCTM().inverse()).x;
+  }
+
+  // ---------- Input ----------
+  function press(x){
+    if (S.locked) return;
+    S.holding = true; S.startX = S.curX = S.lastX = x;
+    S.dir = 0; S.ext = x;
+    // contact: a small nudge so the machine reads as movable
+    S.angV += (Math.random() < .5 ? -1 : 1) * 22;
+    S.tyV += 40;
+    S.b.vy -= 18; S.b.vr += (Math.random()-.5)*40;
+    body.classList.add('holding');
+    Snd.grab();
+  }
+  function move(x){
+    if (!S.holding || S.locked) return;
+    S.curX = x;
+    // count direction reversals
+    if (S.dir === 0){
+      if (Math.abs(x - S.ext) > REVERSAL/2){ S.dir = Math.sign(x - S.ext); S.ext = x; }
+    } else if (S.dir === 1){
+      if (x > S.ext) S.ext = x;
+      else if (S.ext - x > REVERSAL){ reversal(); S.dir = -1; S.ext = x; }
+    } else {
+      if (x < S.ext) S.ext = x;
+      else if (x - S.ext > REVERSAL){ reversal(); S.dir = 1; S.ext = x; }
+    }
+  }
+  function reversal(){
+    S.shakes++;
+    const p = S.shakes / NEED;
+    // the bag hops and twists a little more each time
+    S.b.vy -= 45 + 70*p;
+    S.b.vr += (Math.random()-.5) * (60 + 160*p);
+    S.b.vx += (Math.random()-.5) * 40 * p;
+    Snd.crinkle(0.5 + p*0.8);
+    if (S.shakes >= NEED) release_bag();
+  }
+  function release(){
+    if (!S.holding) return;
+    S.holding = false;
+    body.classList.remove('holding');
+    if (S.mode === 'stuck'){ S.shakes = 0; S.dir = 0; }   // effort lost, bag settles back
+  }
+  function release_bag(){
+    S.mode = 'falling'; S.locked = true;
+    S.f.x = STUCK.x + S.b.x; S.f.y = STUCK.y + S.b.y; S.f.r = STUCK.r + S.b.r;
+    S.f.vy = -110; S.f.vr = (Math.random() < .5 ? -1 : 1) * (160 + Math.random()*120);
+    S.holding = false; body.classList.remove('holding'); body.classList.add('done');
+    Snd.pop();
+  }
+
+  machine.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    svg.setPointerCapture(e.pointerId);
+    press(svgX(e.clientX, e.clientY));
+  });
+  svg.addEventListener('pointermove', e => move(svgX(e.clientX, e.clientY)));
+  svg.addEventListener('pointerup', release);
+  svg.addEventListener('pointercancel', release);
+  svg.addEventListener('lostpointercapture', release);
+
+  // keyboard: alternate arrow keys to shake
+  machine.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    if (S.locked) return;
+    const side = e.key === 'ArrowRight' ? 1 : -1;
+    if (!S.holding){ press(0); S.key.active = true; }
+    if (S.key.active){ move(side * 40); }
+    clearTimeout(S.key.timer);
+    S.key.timer = setTimeout(() => { if (S.key.active){ S.key.active = false; release(); } }, 700);
+  });
+  machine.addEventListener('blur', () => { if (S.key.active){ S.key.active = false; release(); } });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    clearTimeout(S.key.timer);
+    S = initial();
+    body.classList.remove('holding','done');
+    bagStuck.setAttribute('visibility','visible');
+    bagTray.setAttribute('visibility','hidden');
+    S.tyV = 30; // tiny settle so the reset reads as a fresh start
+  });
+
+  const soundBtn = document.getElementById('sound');
+  soundBtn.addEventListener('click', () => {
+    const off = soundBtn.getAttribute('aria-pressed') !== 'true';
+    soundBtn.setAttribute('aria-pressed', String(off));
+    soundBtn.setAttribute('aria-label', off ? 'Unmute sound' : 'Mute sound');
+    Snd.setMuted(off);
+  });
+
+  // ---------- Simulation ----------
+  function step(dt){
+    // pointer speed for a bit of unpredictable wobble
+    const dx = S.curX - S.lastX; S.lastX = S.curX;
+    S.speed = S.speed*0.8 + Math.abs(dx)/dt*0.2;
+
+    // machine tilt
+    let target = 0, txT = 0, tyT = 0;
+    if (S.holding && !S.locked){
+      const d = S.curX - S.startX;
+      target = Math.max(-MAX_TILT, Math.min(MAX_TILT, d*0.11));
+      txT = Math.max(-14, Math.min(14, d*0.07));
+      tyT = 2;
+      S.angV += (Math.random()-.5) * Math.min(S.speed, 1500) * (reduced ? 0 : 0.035);
+    }
+    const k = 170, c = reduced ? 22 : 7.5;
+    const angA = k*(target - S.ang) - c*S.angV;
+    const prevAng = S.ang;
+    S.angV += angA*dt; S.ang += S.angV*dt;
+    if ((prevAng > 0) !== (S.ang > 0) && Math.abs(S.angV) > 18)
+      Snd.knock(Math.min(1, Math.abs(S.angV)/140));
+    S.txV += (220*(txT - S.tx) - 16*S.txV)*dt; S.tx += S.txV*dt;
+    S.tyV += (400*(tyT - S.ty) - 18*S.tyV)*dt; S.ty += S.tyV*dt;
+
+    if (S.mode === 'stuck'){
+      const p = S.shakes / NEED;
+      const bx0 = p*3, by0 = p*15, br0 = p*10;
+      const drive = (0.6 + p) * (reduced ? .4 : 1);
+      const b = S.b;
+      b.vx += (-300*(b.x - bx0) - 11*b.vx - angA*0.007*drive*60)*dt;
+      b.vy += (-320*(b.y - by0) - 12*b.vy)*dt;
+      b.vr += (-280*(b.r - br0) - 9*b.vr  - angA*0.01*drive*60)*dt;
+      // rattle: the bag jitters in its slot whenever the machine is moving
+      if (S.holding){
+        const energy = Math.min(1, Math.min(S.speed,1500)/900 + Math.abs(S.angV)/120);
+        const amt = energy * (0.6 + p) * (reduced ? .3 : 1);
+        b.vr += (Math.random()-.5) * amt * 280;
+        b.vx += (Math.random()-.5) * amt * 100;
+        b.vy += (Math.random()-.5) * amt * 80;
+      }
+      b.x += b.vx*dt; b.y += b.vy*dt; b.r += b.vr*dt;
+      b.x = clamp(b.x,-10,10); b.y = clamp(b.y,-14,24); b.r = clamp(b.r,-18,34);
+    }
+    else if (S.mode === 'falling'){
+      const f = S.f;
+      f.vy += 1700*dt; f.y += f.vy*dt; f.r += f.vr*dt;
+      if (f.y > WINDOW_BOTTOM + 70){
+        S.mode = 'tray';
+        bagStuck.setAttribute('visibility','hidden');
+        bagTray.setAttribute('visibility','visible');
+        S.t.y = 455; S.t.vy = 420; S.t.r = 30;
+      }
+    }
+    else if (S.mode === 'tray'){
+      const t = S.t;
+      t.vy += 1700*dt; t.y += t.vy*dt;
+      t.r += (TRAY.r - t.r) * Math.min(1, dt*9);
+      if (t.y >= TRAY.rest){
+        t.y = TRAY.rest;
+        if (t.vy > 60){
+          // thud: the machine wobbles once more as the bag lands
+          Snd.thud(Math.min(1, t.vy/650), t.bounces === 0);
+          if (t.bounces === 0) S.angV += (Math.random()<.5?-1:1) * 26;
+          S.tyV += t.vy*0.12;
+          t.vy = -t.vy*0.33; t.bounces++;
+        } else { t.vy = 0; S.mode = 'done'; }
+      }
+    }
+    S.angPrevV = S.angV;
+  }
+  function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+
+  // ---------- Render ----------
+  function render(){
+    const piv = S.ang >= 0 ? FOOT_R : FOOT_L;
+    machine.setAttribute('transform',
+      `translate(${S.tx.toFixed(2)},${S.ty.toFixed(2)}) rotate(${S.ang.toFixed(3)},${piv.x},${piv.y})`);
+    if (S.mode === 'stuck'){
+      bagStuck.setAttribute('transform',
+        `translate(${(STUCK.x+S.b.x).toFixed(2)},${(STUCK.y+S.b.y).toFixed(2)}) rotate(${(STUCK.r+S.b.r).toFixed(2)}) scale(${BAG_SCALE})`);
+    } else if (S.mode === 'falling'){
+      bagStuck.setAttribute('transform',
+        `translate(${S.f.x.toFixed(2)},${S.f.y.toFixed(2)}) rotate(${S.f.r.toFixed(2)}) scale(${BAG_SCALE})`);
+    } else {
+      bagTray.setAttribute('transform',
+        `translate(${TRAY.x},${S.t.y.toFixed(2)}) rotate(${S.t.r.toFixed(2)}) scale(${BAG_SCALE})`);
+    }
+  }
+
+  let last = performance.now();
+  let nextRattle = 0;
+  function frame(now){
+    let dt = Math.min(0.033, (now - last)/1000); last = now;
+    const n = 3; for (let i=0;i<n;i++) step(dt/n);
+    render();
+    // continuous bag rattle while the machine is being shaken
+    if (S.holding && S.mode === 'stuck'){
+      const e = Math.min(1, Math.min(S.speed,1500)/900 + Math.abs(S.angV)/120);
+      if (e > .15 && now > nextRattle){
+        Snd.crinkle(e * (0.35 + 0.6*S.shakes/NEED));
+        nextRattle = now + 70 + Math.random()*90 - e*30;
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  render();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
