@@ -152,6 +152,36 @@ body.done #machine, body.intro #machine { cursor: default; }
 #sound[aria-pressed="true"] .on { display: none; }
 #sound[aria-pressed="true"] .off { display: block; }
 
+/* ---------- Tool panel ---------- */
+#toolsBtn[aria-expanded="true"] { background: var(--btn-hover); }
+.tools {
+  position: absolute; z-index: 6;
+  top: calc(env(safe-area-inset-top, 0px) + 70px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  width: min(248px, calc(100vw - 32px));
+  display: grid; gap: 10px; padding: 12px 14px 14px;
+  border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--btn); color: var(--ink);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .14);
+  font-size: 14px; touch-action: auto;
+}
+.tools[hidden] { display: none; }
+.tools-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.tools-row { display: flex; align-items: center; gap: 10px; }
+.tools-row label { flex: 1; }
+.tools input[type="color"] {
+  width: 44px; height: 32px; padding: 2px; cursor: pointer;
+  border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+}
+.tools output { min-width: 68px; font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.tools-reset {
+  justify-self: start; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: 13px;
+}
+.tools-reset:hover:not(:disabled) { background: var(--btn-hover); }
+.tools-reset:disabled { opacity: .45; cursor: default; }
+.tools input:focus-visible, .tools-reset:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
 #again {
   position: absolute; z-index: 5;
   right: calc(env(safe-area-inset-right, 0px) + 16px);

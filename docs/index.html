@@ -267,6 +267,13 @@
   </ol>
 
   <div class="controls">
+    <button id="toolsBtn" class="ctrl" type="button" aria-label="Tools" aria-expanded="false" aria-controls="tools">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 6h10"/><path d="M18 6h2"/><circle cx="16" cy="6" r="2"/>
+        <path d="M4 12h4"/><path d="M12 12h8"/><circle cx="10" cy="12" r="2"/>
+        <path d="M4 18h12"/><path d="M20 18h0"/><circle cx="18" cy="18" r="2"/>
+      </svg>
+    </button>
     <button id="sound" class="ctrl" type="button" aria-label="Mute sound" aria-pressed="false">
       <svg class="on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>
@@ -275,6 +282,17 @@
         <path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9l5 6"/><path d="M22 9l-5 6"/>
       </svg>
     </button>
+  </div>
+
+  <!-- Tool panel: live design controls (does not touch the interactions) -->
+  <div id="tools" class="tools" role="dialog" aria-label="Tools" hidden>
+    <div class="tools-title">Tools</div>
+    <div class="tools-row">
+      <label for="bgColor">Background</label>
+      <input type="color" id="bgColor" value="#f2f2f2">
+      <output id="bgHex" for="bgColor">#F2F2F2</output>
+    </div>
+    <button id="bgReset" class="tools-reset" type="button">Reset to theme color</button>
   </div>
 
   <button id="again" type="button" tabindex="-1">
@@ -293,5 +311,6 @@
 <script src="js/coin.js"></script>
 <script src="js/machine.js"></script>
 <script src="js/sequence.js"></script>
+<script src="js/tools.js"></script>
 </body>
 </html>
