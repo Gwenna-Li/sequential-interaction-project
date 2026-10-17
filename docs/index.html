@@ -267,6 +267,7 @@
   </ol>
 
   <div class="controls">
+    <button id="refineBtn" class="ctrl ctrl-wide" type="button" aria-expanded="false" aria-controls="refine">Refine</button>
     <button id="toolsBtn" class="ctrl" type="button" aria-label="Tools" aria-expanded="false" aria-controls="tools">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 6h10"/><path d="M18 6h2"/><circle cx="16" cy="6" r="2"/>
@@ -295,6 +296,25 @@
     <button id="bgReset" class="tools-reset" type="button">Reset to theme color</button>
   </div>
 
+  <!-- Refinement panel: tunes the real wallet / machine / chips behaviour -->
+  <div id="refine" class="tools refine" role="region" aria-label="Refinement panel" hidden>
+    <div class="tools-title">Refinement</div>
+    <div class="tools-field">
+      <div class="tools-head"><label for="rfOpen">Wallet opening angle</label><output id="rfOpenOut" for="rfOpen">180°</output></div>
+      <input type="range" id="rfOpen" min="0" max="180" step="1" value="180">
+      <p id="rfOpenNote" class="tools-note" hidden>Below 90° the cover stays partly over the coins.</p>
+    </div>
+    <div class="tools-field">
+      <div class="tools-head"><label for="rfShake">Machine shake amount</label><output id="rfShakeOut" for="rfShake">16 px</output></div>
+      <input type="range" id="rfShake" min="0" max="30" step="1" value="16">
+    </div>
+    <div class="tools-field">
+      <div class="tools-head"><label for="rfFall">Chip falling speed</label><output id="rfFallOut" for="rfFall">5</output></div>
+      <input type="range" id="rfFall" min="1" max="10" step="1" value="5">
+    </div>
+    <button id="rfReset" class="tools-reset" type="button">Reset to defaults</button>
+  </div>
+
   <button id="again" type="button" tabindex="-1">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>
@@ -312,5 +332,6 @@
 <script src="js/machine.js"></script>
 <script src="js/sequence.js"></script>
 <script src="js/tools.js"></script>
+<script src="js/refine.js"></script>
 </body>
 </html>

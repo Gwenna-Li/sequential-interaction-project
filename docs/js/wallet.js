@@ -34,6 +34,12 @@
   let dragging = false, done = false;
   let grabX = 0, grabEdge = 0, lastP = 0, crinkleAcc = 0;
 
+  // Refinement: how far the wallet opens (degrees). 180 = flat open, as in the study.
+  // The drag stops at this angle and the completion thresholds are fractions of it.
+  let openDeg = 180;
+  const openTarget = () => Math.max(0, Math.min(REST_CLOSED, 180 - openDeg));
+  const openFrac = a => openDeg <= 180 - REST_CLOSED ? 1 : (180 - a) / openDeg;
+
   // ---- pick up ----
   const TILT_MAX = 56;       // near edge lifted toward the viewer, pivoting on the far edge
   const CLOSED_TOP = 52, CLOSED_H = 158;   // closed wallet's far edge and depth, viewBox units
@@ -167,12 +173,12 @@
     const ex = grabEdge + (toVB(e) - grabX);
     const c = Math.max(-1, Math.min(1, (200 - ex) / HALF));
     const raw = Math.acos(c) * 180 / Math.PI;
-    target = Math.min(REST_CLOSED, raw);
+    target = Math.max(openTarget(), Math.min(REST_CLOSED, raw));
     const p = 1 - target / 180;
     const dp = Math.abs(p - lastP); lastP = p;
     crinkleAcc += dp;
     while (crinkleAcc > 0.018 + Math.random() * 0.02) { crinkleAcc -= 0.02; crinkle(Math.min(1, dp * 25)); }
-    if (p >= 0.96) complete();
+    if (openFrac(target) >= 0.96) complete();
   }
 
   function release() {
@@ -181,7 +187,7 @@
     stage.classList.remove('dragging');
     liftTarget = 0;
     if (done) return;
-    const p = 1 - phi / 180;
+    const p = openFrac(phi);
     if (p >= 0.8) complete();
     else if (p < 0.35) { target = REST_CLOSED; crinkle(0.4); }
     else { target = Math.min(REST_CLOSED, phi + 5); }
@@ -192,7 +198,7 @@
     done = true; dragging = false; liftTarget = 0;
     stage.classList.remove('dragging');
     stage.classList.add('done');
-    target = 0;
+    target = openTarget();
     crinkle(0.9); setTimeout(() => crinkle(0.5), 70); setTimeout(() => crinkle(0.3), 160);
     setTimeout(settleCoins, reduced ? 0 : 260);
     App.emit('opened');
@@ -323,6 +329,13 @@
 
   App.wallet = {
     settleCoins,
+    get openAngle() { return openDeg; },
+    // live: an open wallet springs to the new angle; a drag in progress is re-limited
+    setOpenAngle(deg) {
+      openDeg = Math.max(0, Math.min(180, +deg));
+      if (done) target = openTarget();
+      else if (dragging) target = Math.max(openTarget(), target);
+    },
     fadeShadow() { shadeT = 0; },
     reset() {
       done = false; dragging = false; picking = false; picked = false;

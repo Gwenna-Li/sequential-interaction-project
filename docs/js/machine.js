@@ -24,6 +24,12 @@
   const REVERSAL = 24;                                // svg units of travel per reversal
   const MAX_TILT = reduced ? 6 : 11;
 
+  // Refinement: sideways slide while shaking (screen px; null = the study's 14 units)
+  // and chip falling speed (1–10, 5 = the study's speed; scales the fall's time).
+  const SLIDE_U = 14;
+  let shakePx = null, fallSpeed = 5;
+  const slideUnits = () => shakePx === null ? SLIDE_U : shakePx / App.L.cams.machine.s;
+
   let S;
   function initial() {
     return {
@@ -144,7 +150,8 @@
     if (S.holding && !S.locked) {
       const d = S.curX - S.startX;
       target = Math.max(-MAX_TILT, Math.min(MAX_TILT, d * 0.2));
-      txT = Math.max(-14, Math.min(14, d * 0.07));
+      const su = slideUnits();
+      txT = Math.max(-su, Math.min(su, d * 0.07 * su / SLIDE_U));
       tyT = 2;
       S.angV += (Math.random() - .5) * Math.min(S.speed, 1500) * (reduced ? 0 : 0.035);
     }
@@ -155,6 +162,8 @@
     if ((prevAng > 0) !== (S.ang > 0) && Math.abs(S.angV) > 18)
       Snd.knock(Math.min(1, Math.abs(S.angV) / 140));
     S.txV += (220 * (txT - S.tx) - 16 * S.txV) * dt; S.tx += S.txV * dt;
+    // back exactly to centre once the shake has settled
+    if (txT === 0 && Math.abs(S.tx) < 0.01 && Math.abs(S.txV) < 0.05) { S.tx = 0; S.txV = 0; }
     S.tyV += (400 * (tyT - S.ty) - 18 * S.tyV) * dt; S.ty += S.tyV * dt;
     if (S.ready && S.mode === 'stuck') {
       S.readyT += dt;
@@ -207,8 +216,8 @@
       b.x = clamp(b.x, -10, 10); b.y = clamp(b.y, -14, 24); b.r = clamp(b.r, -18, 34);
     }
     else if (S.mode === 'falling') {
-      const f = S.f;
-      f.vy += 1700 * dt; f.y += f.vy * dt; f.r += f.vr * dt;
+      const f = S.f, fdt = dt * fallSpeed / 5;
+      f.vy += 1700 * fdt; f.y += f.vy * fdt; f.r += f.vr * fdt;
       if (f.y > WINDOW_BOTTOM + 70) {
         S.mode = 'tray';
         bagStuck.setAttribute('visibility', 'hidden');
@@ -217,9 +226,9 @@
       }
     }
     else if (S.mode === 'tray') {
-      const t = S.t;
-      t.vy += 1700 * dt; t.y += t.vy * dt;
-      t.r += (TRAY.r - t.r) * Math.min(1, dt * 9);
+      const t = S.t, fdt = dt * fallSpeed / 5;
+      t.vy += 1700 * fdt; t.y += t.vy * fdt;
+      t.r += (TRAY.r - t.r) * Math.min(1, fdt * 9);
       if (t.y >= TRAY.rest) {
         t.y = TRAY.rest;
         if (t.vy > 60) {
@@ -276,5 +285,11 @@
   requestAnimationFrame(frame);
 
   body.classList.add('intro');
-  App.machine = { reset, startIntro() { S.introGo = true; }, get stuck() { return S.mode !== 'intro'; } };
+  App.machine = {
+    reset, startIntro() { S.introGo = true; }, get stuck() { return S.mode !== 'intro'; },
+    // the study's slide in screen px on this screen (the default for the shake slider)
+    get defaultShakePx() { return SLIDE_U * App.L.cams.machine.s; },
+    setShakePx(px) { shakePx = px === null ? null : Math.max(0, Math.min(30, +px)); },
+    setFallSpeed(v) { fallSpeed = Math.max(1, Math.min(10, +v)); }
+  };
 })();
