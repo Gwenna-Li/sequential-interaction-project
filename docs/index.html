@@ -58,16 +58,18 @@
       </g></g>
       <clipPath id="windowClip" clipPathUnits="userSpaceOnUse"><rect x="86.5" y="71.5" width="177" height="377"/></clipPath>
       <clipPath id="openingClip" clipPathUnits="userSpaceOnUse"><rect x="99.4" y="470.2" width="150.8" height="60.4"/></clipPath>
+      <linearGradient id="vmPitchGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="1"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
       <linearGradient id="sp-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d4d4d4"/><stop offset="100%" stop-color="#a8a8a8"/></linearGradient>
       <linearGradient id="sp-plate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e8e8e8"/><stop offset="100%" stop-color="#b5b5b5"/></linearGradient>
       <linearGradient id="sp-opening" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#111111"/><stop offset="100%" stop-color="#3a3a3a"/></linearGradient>
     </defs>
 
     <rect id="groundFill" x="-6000" y="566" width="12000" height="6000"/>
+    <ellipse id="vmFloorShadow" cx="200" cy="569" rx="150" ry="2" fill="#000" opacity="0"/>
     <line id="horizon" x1="-6000" y1="566" x2="6000" y2="566" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
 
     <!-- Vending machine (from shake-the-vending-machine). Its coin slot is the insert-the-coin slot panel, scaled into place. -->
-    <g id="machine" tabindex="-1" role="button" aria-label="Vending machine. Hold and move left and right, or use the arrow keys, to shake it.">
+    <g id="machine" tabindex="-1" role="button" aria-label="Vending machine. Hold and move left and right to shake it, or up and down to tilt it forward and back. Arrow keys work too.">
       <rect class="focus-ring" x="48" y="18" width="304" height="560" rx="14" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="6 6"/>
       <g id="vmArt"><g stroke="#000000" stroke-width="3" stroke-linejoin="round">
         <rect x="80" y="548" width="40" height="18" fill="#555555"/>
@@ -145,6 +147,8 @@
         <line x1="160" y1="108" x2="240" y2="108" stroke-width="4"/>
         <rect x="60" y="172" width="280" height="14" rx="3" fill="#9a9a9a"/>
       </g></g>
+      <!-- forward/backward tilt shading (drawn over the cabinet face) -->
+      <rect id="vmPitchShade" x="60" y="30" width="280" height="520" rx="8" fill="url(#vmPitchGrad)" opacity="0" pointer-events="none"/>
     </g>
   </svg>
 
@@ -311,6 +315,14 @@
     <div class="tools-field">
       <div class="tools-head"><label for="rfFall">Chip falling speed</label><output id="rfFallOut" for="rfFall">5</output></div>
       <input type="range" id="rfFall" min="1" max="10" step="1" value="5">
+    </div>
+    <div class="tools-field">
+      <div class="tools-head"><label for="rfSide">Side tilt intensity</label><output id="rfSideOut" for="rfSide">100%</output></div>
+      <input type="range" id="rfSide" min="25" max="200" step="5" value="100">
+    </div>
+    <div class="tools-field">
+      <div class="tools-head"><label for="rfPitch">Forward/back tilt intensity</label><output id="rfPitchOut" for="rfPitch">100%</output></div>
+      <input type="range" id="rfPitch" min="0" max="200" step="5" value="100">
     </div>
     <button id="rfReset" class="tools-reset" type="button">Reset to defaults</button>
   </div>

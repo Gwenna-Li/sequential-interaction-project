@@ -30,13 +30,37 @@
   let shakePx = null, fallSpeed = 5;
   const slideUnits = () => shakePx === null ? SLIDE_U : shakePx / App.L.cams.machine.s;
 
+  // Push / pull. Side tilt intensity scales the existing left/right tilt and wobble
+  // (1 = the study). Vertical drag tilts the machine forward (up) or backward (down);
+  // the 2D art fakes that pitch by foreshortening from the feet, a slight width change,
+  // face shading and a floor shadow.
+  let sideI = 1, pitchI = 1;
+  const PITCH_MAX = reduced ? 8 : 14;                 // degrees at 100%
+  const PITCH_GAIN = 0.12;                            // degrees per unit of vertical drag
+  const pitchShade = document.getElementById('vmPitchShade');
+  const pitchStops = document.querySelectorAll('#vmPitchGrad stop');
+  const floorShadow = document.getElementById('vmFloorShadow');
+  const pitchScale = p => 1 + 0.16 * Math.sin(p * Math.PI / 180);
+  // largest side tilt that keeps the cabinet's top corner on screen
+  function safeTilt() {
+    const half = svg.clientWidth / (2 * App.L.cams.machine.s) - 10;
+    const room = half - Math.abs(S.tx);
+    const w = 140 * pitchScale(Math.max(0, S.pitch));      // half-width of the cabinet
+    for (let a = 30; a > 0; a -= 0.5) {
+      const r = a * Math.PI / 180;
+      if (120 + (w - 120) * Math.cos(r) + 536 * Math.sin(r) <= room) return a;
+    }
+    return 0;
+  }
+
   let S;
   function initial() {
     return {
       mode: 'intro', locked: true, holding: false, reported: false, introGo: false,
       intro: { t: 0, y: START.y, vy: 0, r: 0, whir: false },
       ang: 0, angV: 0, angPrevV: 0, tx: 0, txV: 0, ty: 0, tyV: 0,
-      startX: 0, curX: 0, lastX: 0, speed: 0,
+      pitch: 0, pitchV: 0, safe: MAX_TILT,
+      startX: 0, curX: 0, lastX: 0, speed: 0, startY: 0, curY: 0,
       dir: 0, ext: 0, shakes: 0, lastRev: 0, ready: false, readyT: 0,
       b: { x: 0, y: 0, r: 0, vx: 0, vy: 0, vr: 0 },
       f: { x: 0, y: 0, r: 0, vy: 0, vr: 0 },
@@ -46,26 +70,28 @@
   }
   S = initial();
 
-  function svgX(clientX, clientY) {
+  function svgPt(clientX, clientY) {
     const p = svg.createSVGPoint(); p.x = clientX; p.y = clientY;
-    return p.matrixTransform(svg.getScreenCTM().inverse()).x;
+    return p.matrixTransform(svg.getScreenCTM().inverse());
   }
 
   // ---------- Input ----------
-  function press(x) {
+  function press(x, y = 0) {
     if (S.locked || App.step !== 4) return;
     S.holding = true; S.startX = S.curX = S.lastX = x;
+    S.startY = S.curY = y;
     S.dir = 0; S.ext = x;
     // contact: a small nudge so the machine reads as movable
-    S.angV += (Math.random() < .5 ? -1 : 1) * 22;
+    S.angV += (Math.random() < .5 ? -1 : 1) * 22 * sideI;
     S.tyV += 40;
     S.b.vy -= 18; S.b.vr += (Math.random() - .5) * 40;
     body.classList.add('holding');
     Snd.grab();
   }
-  function move(x) {
+  function move(x, y) {
     if (!S.holding || S.locked) return;
     S.curX = x;
+    if (y !== undefined) S.curY = y;
     // count direction reversals
     if (S.dir === 0) {
       if (Math.abs(x - S.ext) > REVERSAL / 2) { S.dir = Math.sign(x - S.ext); S.ext = x; }
@@ -80,7 +106,7 @@
   function reversal() {
     // only count real swings: the machine must actually be tilted, and not too fast
     const now = performance.now();
-    if (S.ready || (Math.abs(S.ang) < 1.2 && Math.abs(S.angV) < 15) || now - S.lastRev < 90) return;
+    if (S.ready || (Math.abs(S.ang) < 1.2 * sideI && Math.abs(S.angV) < 15 * sideI) || now - S.lastRev < 90) return;
     S.lastRev = now;
     S.shakes++;
     const p = S.shakes / NEED;
@@ -109,15 +135,25 @@
     if (e.button !== 0 || App.step !== 4) return;
     e.preventDefault();
     svg.setPointerCapture(e.pointerId);
-    press(svgX(e.clientX, e.clientY));
+    const p = svgPt(e.clientX, e.clientY);
+    press(p.x, p.y);
   });
-  svg.addEventListener('pointermove', e => { if (S.holding) move(svgX(e.clientX, e.clientY)); });
+  svg.addEventListener('pointermove', e => {
+    if (!S.holding) return;
+    const p = svgPt(e.clientX, e.clientY);
+    move(p.x, p.y);
+  });
   svg.addEventListener('pointerup', release);
   svg.addEventListener('pointercancel', release);
   svg.addEventListener('lostpointercapture', release);
 
-  // keyboard: alternate arrow keys to shake
+  // keyboard: alternate left/right arrows to shake; up/down give a forward/backward push
   machine.addEventListener('keydown', e => {
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && App.step === 4) {
+      e.preventDefault();
+      if (!S.locked) S.pitchV += (e.key === 'ArrowUp' ? 1 : -1) * 90 * pitchI;
+      return;
+    }
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if (App.step !== 4) return;
     e.preventDefault();
@@ -146,21 +182,37 @@
     S.speed = S.speed * 0.8 + Math.abs(dx) / dt * 0.2;
 
     // machine tilt
-    let target = 0, txT = 0, tyT = 0;
+    let target = 0, txT = 0, tyT = 0, pitchT = 0;
     if (S.holding && !S.locked) {
       const d = S.curX - S.startX;
-      target = Math.max(-MAX_TILT, Math.min(MAX_TILT, d * 0.2));
+      const maxT = Math.min(MAX_TILT * sideI, S.safe);
+      target = Math.max(-maxT, Math.min(maxT, d * 0.2 * sideI));
+      const pm = PITCH_MAX * pitchI;
+      pitchT = Math.max(-pm, Math.min(pm, -(S.curY - S.startY) * PITCH_GAIN * pitchI));
       const su = slideUnits();
       txT = Math.max(-su, Math.min(su, d * 0.07 * su / SLIDE_U));
       tyT = 2;
-      S.angV += (Math.random() - .5) * Math.min(S.speed, 1500) * (reduced ? 0 : 0.035);
+      S.angV += (Math.random() - .5) * Math.min(S.speed, 1500) * (reduced ? 0 : 0.035) * sideI;
     }
     const k = 170, c = reduced ? 22 : 7.5;
     const angA = k * (target - S.ang) - c * S.angV;
     const prevAng = S.ang;
     S.angV += angA * dt; S.ang += S.angV * dt;
+    // keep the top on screen even through the spring's overshoot
+    if (Math.abs(S.ang) > S.safe) { S.ang = Math.sign(S.ang) * S.safe; S.angV *= -0.3; }
     if ((prevAng > 0) !== (S.ang > 0) && Math.abs(S.angV) > 18)
       Snd.knock(Math.min(1, Math.abs(S.angV) / 140));
+
+    // forward / backward pitch: a looser spring, so it rocks back and settles
+    const pc = reduced ? 24 : 8;
+    const pitchA = 140 * (pitchT - S.pitch) - pc * S.pitchV;
+    const prevPitch = S.pitch;
+    S.pitchV += pitchA * dt; S.pitch += S.pitchV * dt;
+    const pLim = Math.min(26, PITCH_MAX * 2) * 1.15;
+    if (Math.abs(S.pitch) > pLim) { S.pitch = Math.sign(S.pitch) * pLim; S.pitchV *= -0.3; }
+    if ((prevPitch > 0) !== (S.pitch > 0) && Math.abs(S.pitchV) > 40)
+      Snd.knock(Math.min(0.7, Math.abs(S.pitchV) / 220));
+    if (pitchT === 0 && Math.abs(S.pitch) < 0.01 && Math.abs(S.pitchV) < 0.05) { S.pitch = 0; S.pitchV = 0; }
     S.txV += (220 * (txT - S.tx) - 16 * S.txV) * dt; S.tx += S.txV * dt;
     // back exactly to centre once the shake has settled
     if (txT === 0 && Math.abs(S.tx) < 0.01 && Math.abs(S.txV) < 0.05) { S.tx = 0; S.txV = 0; }
@@ -204,6 +256,7 @@
       b.vx += (-300 * (b.x - bx0) - 11 * b.vx - angA * 0.007 * drive * 60) * dt;
       b.vy += (-320 * (b.y - by0) - 12 * b.vy) * dt;
       b.vr += (-280 * (b.r - br0) - 9 * b.vr - angA * 0.01 * drive * 60) * dt;
+      b.vy += (-pitchA * 0.004 * drive * 60) * dt;     // rocking front-to-back jostles it too
       // rattle: the bag jitters in its slot whenever the machine is moving
       if (S.holding) {
         const energy = Math.min(1, Math.min(S.speed, 1500) / 900 + Math.abs(S.angV) / 120);
@@ -248,8 +301,23 @@
   // ---------- Render ----------
   function render() {
     const piv = S.ang >= 0 ? FOOT_R : FOOT_L;
+    // pitch: foreshorten from the feet (y 566), a touch wider when leaning toward the viewer
+    const pr = S.pitch * Math.PI / 180, ps = pitchScale(S.pitch);
+    const pitchT = Math.abs(S.pitch) < 0.005 ? ''
+      : ` translate(200,566) scale(${ps.toFixed(4)},${(Math.cos(pr) * ps).toFixed(4)}) translate(-200,-566)`;
     machine.setAttribute('transform',
-      `translate(${S.tx.toFixed(2)},${S.ty.toFixed(2)}) rotate(${S.ang.toFixed(3)},${piv.x},${piv.y})`);
+      `translate(${S.tx.toFixed(2)},${S.ty.toFixed(2)}) rotate(${S.ang.toFixed(3)},${piv.x},${piv.y})${pitchT}`);
+    // face shading: darker leaning forward (face turns down), lighter leaning back
+    const sh = Math.min(0.28, Math.abs(Math.sin(pr)) * 0.9);
+    const shadeCol = S.pitch > 0 ? '#000' : '#fff';
+    pitchStops.forEach(st => st.setAttribute('stop-color', shadeCol));
+    pitchShade.setAttribute('opacity', sh.toFixed(3));
+    // floor shadow in front of the feet when the top comes toward the viewer
+    const fwd = Math.max(0, Math.sin(pr));
+    floorShadow.setAttribute('cx', (200 + S.tx).toFixed(2));
+    floorShadow.setAttribute('rx', (150 * ps).toFixed(2));
+    floorShadow.setAttribute('ry', (2 + 60 * fwd).toFixed(2));
+    floorShadow.setAttribute('opacity', (Math.min(1, fwd * 6) * 0.2).toFixed(3));
     if (S.mode === 'intro') {
       bagStuck.setAttribute('transform',
         `translate(${START.x},${S.intro.y.toFixed(2)}) rotate(${S.intro.r.toFixed(2)}) scale(${BAG_SCALE})`);
@@ -269,6 +337,7 @@
   let nextRattle = 0;
   function frame(now) {
     const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    S.safe = Math.min(MAX_TILT * 2, safeTilt());
     const n = 3; for (let i = 0; i < n; i++) step(dt / n);
     render();
     // continuous bag rattle while the machine is being shaken
@@ -290,6 +359,8 @@
     // the study's slide in screen px on this screen (the default for the shake slider)
     get defaultShakePx() { return SLIDE_U * App.L.cams.machine.s; },
     setShakePx(px) { shakePx = px === null ? null : Math.max(0, Math.min(30, +px)); },
-    setFallSpeed(v) { fallSpeed = Math.max(1, Math.min(10, +v)); }
+    setFallSpeed(v) { fallSpeed = Math.max(1, Math.min(10, +v)); },
+    setSideIntensity(pct) { sideI = Math.max(0.25, Math.min(2, pct / 100)); },
+    setPitchIntensity(pct) { pitchI = Math.max(0, Math.min(2, pct / 100)); }
   };
 })();
