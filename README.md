@@ -8,6 +8,8 @@ One continuous interaction built from three studies:
 
 - `docs/` — the finished static site for GitHub Pages (`docs/index.html`, plain CSS/JS, no build step).
   Publish with *Settings → Pages → Deploy from a branch → `/docs`*.
+- `docs/color/` — a separate color version (same interactions, recolored), served at `/color/`
+  on the same Pages site. It has its own copies of every file.
 - `studies/` — the original studies, extracted from the ZIPs, for reference.
 
 | Step | Source study | Gesture |

@@ -1,0 +1,217 @@
+/* Wallet to Chips (color version) — same sequence and interactions, recolored */
+
+:root {
+  --bg: #f4efe7; --ground: #e7ddcf; --horizon: #b9aa95;
+  --ink: #2a211c; --ink-soft: #8c7d70; --line: #b3a392;
+  --btn: #fffaf3; --btn-hover: #efe5d7;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #2a2521; --ground: #221e1b; --horizon: #5e544a;
+    --ink: #f1e8dd; --ink-soft: #9d8f81; --line: #7c6f62;
+    --btn: #362f2a; --btn-hover: #443b34;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #2a2521; --ground: #221e1b; --horizon: #5e544a;
+  --ink: #f1e8dd; --ink-soft: #9d8f81; --line: #7c6f62;
+  --btn: #362f2a; --btn-hover: #443b34;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); overflow: hidden;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+#app { position: fixed; inset: 0; overflow: hidden; touch-action: none; transition: opacity .35s ease; }
+#app.fade { opacity: 0; }
+
+/* ---------- World ---------- */
+#world { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#groundFill { fill: var(--ground); }
+#horizon { stroke: var(--horizon); }
+
+/* ---------- Wallet (open-the-wallet) ---------- */
+#walletPose { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; z-index: 2; }
+#wShadow {
+  position: absolute; left: 50%; top: 20%; width: 37%; height: 61.5%;
+  border-radius: 6%; background: #000; opacity: .3; filter: blur(3px);
+}
+#walletTilt { position: absolute; inset: 0; transform-origin: 68.5% 20%; outline: none; }
+#wstage { position: absolute; inset: 0; pointer-events: none; }
+.step-1 #wstage, .step-2 #wstage { pointer-events: auto; }
+#wstage svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+#base, #overlay { pointer-events: none; }
+#coverWrap { position: absolute; inset: 0; pointer-events: none; }
+#cover {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d; transform-origin: 50% 50%; will-change: transform;
+}
+.slice { position: absolute; inset: 0; pointer-events: none; will-change: transform; }
+.slice svg { pointer-events: none; }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.face svg { pointer-events: none; }
+.face .hit { pointer-events: none; }
+.step-2 .face .hit { pointer-events: visiblePainted; cursor: grab; }
+#outer { transform: rotateY(180deg); }
+
+#pickHit { pointer-events: none; }
+.step-1 #pickHit { pointer-events: visiblePainted; cursor: grab; }
+#wstage.dragging, #wstage.dragging .hit, #wstage.dragging #pickHit { cursor: grabbing; }
+#wstage.done .hit { cursor: default; }
+
+#edgeGlow, #pickGlow { animation: glow 2.4s ease-in-out infinite; }
+@keyframes glow { 0%, 100% { opacity: .25; } 50% { opacity: .85; } }
+
+#coins .coin { transform-box: fill-box; transform-origin: 50% 100%; }
+#coins.settle .coin { animation: settle .6s cubic-bezier(.3, 1.5, .5, 1) both; }
+@keyframes settle {
+  0% { transform: translateY(0) rotate(0); }
+  35% { transform: translateY(-9px) rotate(-3deg); }
+  65% { transform: translateY(2px) rotate(1.5deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+.wcoin { outline: none; }
+.step-3 .wcoin { pointer-events: visiblePainted; cursor: grab; }
+.coinRing { stroke: var(--ink); opacity: 0; pointer-events: none; }
+.wcoin:focus-visible .coinRing { opacity: 1; }
+
+.wring { stroke: var(--ink-soft); opacity: 0; }
+.step-1 #walletTilt:focus-visible .wring-closed,
+.step-2 #walletTilt:focus-visible .wring-open { opacity: 1; }
+
+/* ---------- Coin in hand (insert-the-coin) ---------- */
+#coin {
+  position: absolute; left: 0; top: 0; z-index: 3; visibility: hidden;
+  touch-action: none; cursor: grab; will-change: transform;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .25)); transition: filter .12s ease-out;
+}
+#coin.lifted { cursor: grabbing; filter: drop-shadow(0 16px 10px rgba(0, 0, 0, .26)); }
+#coin.flat { filter: none; }
+#coin .face { width: 100%; height: 100%; transform-origin: 50% 50%; }
+#coin svg { width: 100%; height: 100%; display: block; pointer-events: none; overflow: visible; }
+#slotOutline { transition: stroke .45s ease, stroke-width .2s ease; }
+
+/* ---------- Vending machine (shake-the-vending-machine) ---------- */
+#machine { outline: none; }
+.step-4 #machine { cursor: grab; }
+body.holding, body.holding #machine { cursor: grabbing; }
+body.done #machine, body.intro #machine { cursor: default; }
+.focus-ring { opacity: 0; transition: opacity .15s; }
+.step-4 #machine:focus-visible .focus-ring { opacity: 1; }
+
+/* ---------- UI ---------- */
+#progress {
+  position: absolute; z-index: 5; margin: 0; padding: 0; list-style: none;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: calc(env(safe-area-inset-left, 0px) + 16px);
+  display: flex; gap: 2px; padding: 4px; font-size: 13px; line-height: 1;
+  background: var(--bg); border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 35%, transparent);
+  pointer-events: none;
+}
+#progress li {
+  display: flex; align-items: center; gap: 7px;
+  height: 32px; padding: 0 12px 0 7px; border-radius: 999px;
+  color: var(--ink-soft); border: 1.5px solid transparent;
+  transition: color .3s, background .3s, border-color .3s;
+}
+#progress .n {
+  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 600; border: 1.5px solid currentColor;
+}
+#progress li[data-state="current"] { color: var(--ink); border-color: var(--line); background: var(--btn); }
+#progress li[data-state="done"] .n { background: currentColor; }
+@media (max-width: 560px) {
+  #progress li:not([data-state="current"]) .t { display: none; }
+  #progress li:not([data-state="current"]) { padding: 0 7px; }
+}
+
+.controls {
+  position: absolute; z-index: 5; display: flex; gap: 10px;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+}
+.ctrl {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1.5px solid var(--line); background: var(--btn); color: var(--ink);
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+  transition: background .15s;
+}
+.ctrl:hover { background: var(--btn-hover); }
+.ctrl:focus-visible, #again:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+#sound .off { display: none; }
+#sound[aria-pressed="true"] .on { display: none; }
+#sound[aria-pressed="true"] .off { display: block; }
+
+/* ---------- Tool panel ---------- */
+#toolsBtn[aria-expanded="true"] { background: var(--btn-hover); }
+.tools {
+  position: absolute; z-index: 6;
+  top: calc(env(safe-area-inset-top, 0px) + 70px);
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  width: min(248px, calc(100vw - 32px));
+  display: grid; gap: 10px; padding: 12px 14px 14px;
+  border-radius: 14px; border: 1.5px solid var(--line);
+  background: var(--btn); color: var(--ink);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .14);
+  font-size: 14px; touch-action: auto;
+}
+.tools[hidden] { display: none; }
+.tools-title { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.tools-row { display: flex; align-items: center; gap: 10px; }
+.tools-row label { flex: 1; }
+.tools input[type="color"] {
+  width: 44px; height: 32px; padding: 2px; cursor: pointer;
+  border: 1.5px solid var(--line); border-radius: 8px; background: var(--bg);
+}
+.tools output { min-width: 68px; font: 12px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.tools-reset {
+  justify-self: start; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--line); background: transparent; color: var(--ink); font: inherit; font-size: 13px;
+}
+.tools-reset:hover:not(:disabled) { background: var(--btn-hover); }
+.tools-reset:disabled { opacity: .45; cursor: default; }
+.tools input:focus-visible, .tools-reset:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Refinement panel (shares the tool panel's look) ---------- */
+.ctrl-wide { width: auto; padding: 0 16px; border-radius: 999px; font: inherit; font-size: 14px; }
+#refineBtn[aria-expanded="true"] { background: var(--btn-hover); }
+.refine { width: min(280px, calc(100vw - 32px)); gap: 14px; max-height: calc(100% - 90px); overflow-y: auto; }
+.tools-field { display: grid; gap: 6px; }
+.tools-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.tools-head output { min-width: 0; text-align: right; }
+.tools input[type="range"] { width: 100%; margin: 0; accent-color: var(--ink); cursor: pointer; }
+.tools-note { margin: 0; font-size: 12px; color: var(--ink-soft); }
+.tools-note[hidden] { display: none; }
+
+#again {
+  position: absolute; z-index: 5;
+  right: calc(env(safe-area-inset-right, 0px) + 16px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  height: 44px; padding: 0 18px 0 14px; border-radius: 999px;
+  border: 1.5px solid var(--line); background: var(--btn); color: var(--ink);
+  display: flex; align-items: center; gap: 8px;
+  font: inherit; font-size: 15px; cursor: pointer;
+  opacity: 0; transform: translateY(6px); pointer-events: none;
+  transition: opacity .45s ease, transform .45s ease, background .15s;
+}
+#again:hover { background: var(--btn-hover); }
+#again svg { transition: transform .25s ease; }
+#again:hover svg { transform: rotate(-40deg); }
+#again.show { opacity: 1; transform: none; pointer-events: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  #edgeGlow, #pickGlow { animation: none; opacity: .6; }
+  #coins.settle .coin { animation: none; }
+  #app { transition: none; }
+  #again { transition: none; }
+}
