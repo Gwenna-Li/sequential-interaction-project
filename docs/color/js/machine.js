@@ -179,7 +179,8 @@
   function step(dt) {
     // pointer speed for a bit of unpredictable wobble
     const dx = S.curX - S.lastX; S.lastX = S.curX;
-    S.speed = S.speed * 0.8 + Math.abs(dx) / dt * 0.2;
+    // guard: two frames with the same timestamp give dt = 0, and 0 / 0 would poison the speed
+    if (dt > 0) S.speed = S.speed * 0.8 + Math.abs(dx) / dt * 0.2;
 
     // machine tilt
     let target = 0, txT = 0, tyT = 0, pitchT = 0;
@@ -336,7 +337,7 @@
   let last = performance.now();
   let nextRattle = 0;
   function frame(now) {
-    const dt = Math.min(0.033, (now - last) / 1000); last = now;
+    const dt = Math.max(0, Math.min(0.033, (now - last) / 1000)); last = now;
     S.safe = Math.min(MAX_TILT * 2, safeTilt());
     const n = 3; for (let i = 0; i < n; i++) step(dt / n);
     render();

@@ -192,6 +192,7 @@ body.done #machine, body.intro #machine { cursor: default; }
 .tools input[type="range"] { width: 100%; margin: 0; accent-color: var(--ink); cursor: pointer; }
 .tools-note { margin: 0; font-size: 12px; color: var(--ink-soft); }
 .tools-note[hidden] { display: none; }
+.tools-sub { margin-top: 2px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
 
 #again {
   position: absolute; z-index: 5;

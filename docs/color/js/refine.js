@@ -4,6 +4,7 @@
 //   Chip falling speed    -> App.machine.setFallSpeed  (speed of the fall + tray bounce)
 //   Side tilt intensity   -> App.machine.setSideIntensity  (left/right tilt + wobble)
 //   Forward/back tilt     -> App.machine.setPitchIntensity (up/down drag pitch)
+//   Colours (colour version) -> App.colors (machine body, product blocks, wallet)
 // Defaults reproduce the prototype exactly. Interaction triggers are not touched.
 (() => {
   const App = window.App;
@@ -16,6 +17,16 @@
   const side = document.getElementById('rfSide'), sideOut = document.getElementById('rfSideOut');
   const pitch = document.getElementById('rfPitch'), pitchOut = document.getElementById('rfPitchOut');
   const reset = document.getElementById('rfReset');
+  // colour pickers (colour version only): each shows its swatch and current value
+  const colorPickers = [
+    { input: 'rfMachineColor', out: 'rfMachineColorOut', key: 'machine', set: 'setMachine' },
+    { input: 'rfProductColor', out: 'rfProductColorOut', key: 'products', set: 'setProducts', defaultLabel: 'Mixed' },
+    { input: 'rfWalletColor', out: 'rfWalletColorOut', key: 'wallet', set: 'setWallet' }
+  ].map(c => ({ ...c, input: document.getElementById(c.input), out: document.getElementById(c.out) }));
+  colorPickers.forEach(c => c.input.addEventListener('input', () => {
+    App.colors[c.set](c.input.value);
+    c.out.textContent = c.input.value.toUpperCase();
+  }));
   const toolsBtn = document.getElementById('toolsBtn');
   const toolsPanel = document.getElementById('tools');
 
@@ -42,6 +53,11 @@
     fall.value = 5; App.machine.setFallSpeed(5); showFall();
     side.value = 100; App.machine.setSideIntensity(100); sideOut.textContent = '100%';
     pitch.value = 100; App.machine.setPitchIntensity(100); pitchOut.textContent = '100%';
+    App.colors.reset();
+    colorPickers.forEach(c => {
+      c.input.value = App.colors.defaults[c.key];
+      c.out.textContent = c.defaultLabel || c.input.value.toUpperCase();
+    });
   }
   reset.addEventListener('click', defaults);
   // until the shake slider is moved, its reading follows the screen size
