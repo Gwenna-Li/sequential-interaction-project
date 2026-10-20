@@ -26,6 +26,8 @@
   function apply(c) {
     custom = c;
     if (c) root.style.setProperty('--bg', c); else root.style.removeProperty('--bg');
+    // colour version: the same picker tints the environment's back wall / sky
+    if (c) root.style.setProperty('--env-bg', c); else root.style.removeProperty('--env-bg');
     const cur = c || themeBg();
     input.value = cur;
     hex.textContent = cur.toUpperCase();
